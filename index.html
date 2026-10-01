@@ -1,0 +1,2097 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drawspell en VF</title>
+<meta name="description" content="Traduis ton deck ManaBox en français pour l'importer dans drawspell.space, avec les vraies cartes VF de Scryfall.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='4' width='44' height='56' rx='6' fill='%232c46a8'/%3E%3Ctext x='32' y='41' font-family='Georgia,serif' font-size='22' font-weight='700' fill='white' text-anchor='middle'%3EVF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Mise en page : en-tête sobre, plan de travail en deux colonnes (deck d'origine | liste pour drawspell),
+   puis la liste des cartes façon « ligne de collection » (édition · numéro · langue) comme en bas des cartes. */
+:root {
+  --paper: #eef0f5;
+  --surface: #ffffff;
+  --surface-2: #f5f6fa;
+  --ink: #161a2b;
+  --muted: #586075;
+  --line: #d5d9e5;
+  --accent: #2c46a8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2e7fa;
+  --ok: #1d6f44;
+  --ok-soft: #daf0e3;
+  --warn: #935300;
+  --warn-soft: #f9ead3;
+  --bad: #a82828;
+  --bad-soft: #f7dddd;
+  --shadow: 0 1px 2px rgba(22, 26, 43, .06), 0 8px 24px rgba(22, 26, 43, .06);
+  --font-display: "Alegreya SC", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-body: "Alegreya Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1219;
+    --surface: #171b26;
+    --surface-2: #1d2230;
+    --ink: #e7e9f1;
+    --muted: #9ca2b7;
+    --line: #2b3144;
+    --accent: #93a8ff;
+    --accent-ink: #0f1219;
+    --accent-soft: #232c52;
+    --ok: #6fd39c;
+    --ok-soft: #173528;
+    --warn: #f1b35d;
+    --warn-soft: #3a2a12;
+    --bad: #ff8f87;
+    --bad-soft: #3d1c1c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1219;
+  --surface: #171b26;
+  --surface-2: #1d2230;
+  --ink: #e7e9f1;
+  --muted: #9ca2b7;
+  --line: #2b3144;
+  --accent: #93a8ff;
+  --accent-ink: #0f1219;
+  --accent-soft: #232c52;
+  --ok: #6fd39c;
+  --ok-soft: #173528;
+  --warn: #f1b35d;
+  --warn-soft: #3a2a12;
+  --bad: #ff8f87;
+  --bad-soft: #3d1c1c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.55 var(--font-body);
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+}
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 1.1; text-wrap: balance; margin: 0; }
+
+.wrap {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+}
+
+/* En-tête */
+.masthead { padding-block: 40px 28px; }
+.masthead .wrap { display: grid; gap: 10px; }
+.eyebrow {
+  margin: 0;
+  font: 600 .74rem/1.2 var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.masthead h1 { font-size: clamp(2.3rem, 6vw, 3.6rem); letter-spacing: .01em; }
+.vf {
+  display: inline-block;
+  padding: .02em .28em .06em;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.lede { margin: 0; max-width: 62ch; font-size: 1.12rem; color: var(--muted); }
+
+/* Plan de travail */
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.panel {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.panel-head h2 { font-size: 1.5rem; }
+.step { font: 600 .72rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.head-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+
+textarea {
+  width: 100%;
+  min-height: 300px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 400 .86rem/1.6 var(--font-mono);
+  tab-size: 4;
+}
+textarea::placeholder { color: var(--muted); opacity: .8; }
+textarea[readonly] { cursor: text; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: .85rem; font-weight: 500; color: var(--muted); }
+select {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 1rem var(--font-body);
+}
+
+button, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 .98rem/1.2 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+button:hover:not(:disabled), .button:hover { border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.small, .button.small { min-height: 34px; padding: 4px 12px; font-size: .9rem; }
+.file-input { position: relative; overflow: hidden; }
+.file-input input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-input:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.hint { margin: 0; font-size: .92rem; color: var(--muted); }
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bad-soft);
+  color: var(--bad);
+  font-weight: 500;
+}
+
+/* Choix du mode */
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.modes button {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 7px;
+}
+.modes button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.mode-note { margin: 0; font-size: .95rem; color: var(--muted); }
+
+/* Résumé */
+.summary { display: grid; gap: 8px; }
+.summary-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.summary-total { font: 700 1.5rem/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.summary-sub { color: var(--muted); font-size: .95rem; }
+.meter { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+.meter span { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.s-same { background: var(--ok); }
+.s-other { background: var(--accent); }
+.s-vo { background: var(--warn); }
+.s-missing { background: var(--bad); }
+.s-pending { background: var(--line); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions .spacer { flex: 1; }
+
+/* Progression */
+.progress { display: grid; gap: 8px; margin-top: 20px; }
+.progress-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.progress p { margin: 0; color: var(--muted); font-size: .95rem; font-variant-numeric: tabular-nums; }
+
+/* Cartes */
+.cards { margin-top: 36px; display: grid; gap: 22px; }
+.cards-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.cards-head h2 { font-size: 1.7rem; }
+.cards-empty {
+  margin: 0;
+  padding: 28px 20px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-align: center;
+}
+.group { display: grid; gap: 10px; }
+.group h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 1.15rem;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.group h3 small { font: 500 .85rem var(--font-mono); color: var(--muted); }
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 10px;
+}
+.card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.thumb {
+  display: block;
+  width: 64px;
+  aspect-ratio: 63 / 88;
+  max-width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.card-body { min-width: 0; display: grid; gap: 3px; }
+.card-name { margin: 0; font-weight: 700; font-size: 1.02rem; line-height: 1.25; overflow-wrap: anywhere; }
+.qty {
+  display: inline-block;
+  min-width: 1.8em;
+  margin-right: 4px;
+  font: 600 .82rem/1 var(--font-mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.card-sub { margin: 0; font-size: .9rem; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.card-meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.collector {
+  font: 600 .74rem/1 var(--font-mono);
+  letter-spacing: .06em;
+  color: var(--muted);
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.badge { font: 700 .74rem/1 var(--font-body); letter-spacing: .03em; padding: 5px 8px; border-radius: 999px; }
+.card[data-status="same"] .badge { background: var(--ok-soft); color: var(--ok); }
+.card[data-status="other"] .badge { background: var(--accent-soft); color: var(--accent); }
+.card[data-status="vo"] .badge { background: var(--warn-soft); color: var(--warn); }
+.card[data-status="missing"] .badge { background: var(--bad-soft); color: var(--bad); }
+.card[data-status="pending"] .badge { background: var(--surface-2); color: var(--muted); }
+.card[data-status="vo"] { border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.card[data-status="missing"] { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.card-note { margin: 4px 0 0; font-size: .86rem; color: var(--muted); }
+.ignored { margin: 0; color: var(--muted); font-size: .92rem; }
+.ignored code { font-family: var(--font-mono); font-size: .85em; }
+
+/* Script */
+.script { margin-top: 48px; display: grid; gap: 18px; }
+.script-head { display: grid; gap: 8px; max-width: 70ch; }
+.script-head h2 { font-size: 1.9rem; }
+.script-head p { margin: 0; color: var(--muted); }
+.methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.method {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.method h3 { font-size: 1.2rem; }
+.method ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.method p { margin: 0; color: var(--muted); font-size: .95rem; }
+.bookmarklet {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 700 1rem var(--font-body);
+  text-decoration: none;
+  cursor: grab;
+}
+.bookmarklet::before { content: "VF"; font: 700 .72rem/1 var(--font-mono); padding: 4px 5px; border-radius: 4px; background: var(--accent); color: var(--accent-ink); }
+.copied { color: var(--ok); font-weight: 600; font-size: .9rem; }
+
+/* Questions */
+.faq { margin-top: 48px; display: grid; gap: 10px; max-width: 80ch; }
+.faq h2 { font-size: 1.6rem; margin-bottom: 4px; }
+details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+summary { cursor: pointer; font-weight: 700; }
+details p { margin: 10px 0 0; color: var(--muted); }
+
+footer { margin-top: 56px; padding-block: 24px 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: .88rem; }
+footer p { margin: 0; max-width: 90ch; }
+
+@media (max-width: 900px) {
+  .workbench { grid-template-columns: minmax(0, 1fr); }
+  .methods { grid-template-columns: minmax(0, 1fr); }
+  textarea { min-height: 220px; }
+}
+@media (max-width: 480px) {
+  .panel { padding: 16px; }
+  .masthead { padding-block: 28px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar span { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">ManaBox &rsaquo; Scryfall &rsaquo; drawspell</p>
+    <h1>Drawspell en <span class="vf">VF</span></h1>
+    <p class="lede">Colle l'export texte de ton deck ManaBox. Le site retrouve chaque carte en français sur Scryfall et te donne une liste à coller dans drawspell, pour jouer avec les cartes en VF.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="workbench" aria-label="Traduction du deck">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <span class="step">Étape 1</span>
+          <h2>Ton deck</h2>
+        </div>
+        <div class="head-tools">
+          <span class="button small file-input">Ouvrir un fichier
+            <input type="file" id="deck-file" accept=".txt,.csv,.dec,text/plain,text/csv" aria-label="Ouvrir un fichier de deck">
+          </span>
+          <button type="button" class="small" id="load-example">Exemple</button>
+        </div>
+      </div>
+      <textarea id="deck-in" spellcheck="false" autocomplete="off" aria-label="Liste du deck"
+        placeholder="// COMMANDER&#10;1 Victor, Valgavoth's Seneschal (DSK) 238&#10;&#10;1 Murder (DSK) 110&#10;1 Sol Ring (MSC) 211&#10;10 Plains (DSK) 272"></textarea>
+      <div class="controls">
+        <div class="field">
+          <label for="lang">Langue des cartes</label>
+          <select id="lang"></select>
+        </div>
+        <button type="button" class="primary" id="run">Traduire le deck</button>
+      </div>
+      <p class="hint">Dans ManaBox, exporte ton deck en texte puis colle-le ici, ou ouvre le fichier .txt. Les listes Moxfield, Archidekt et MTG Arena marchent aussi.</p>
+      <p class="error" id="error" role="alert" hidden></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <span class="step">Étape 2</span>
+          <h2>Pour drawspell</h2>
+        </div>
+      </div>
+      <div class="modes" role="tablist" aria-label="Méthode">
+        <button type="button" role="tab" id="mode-names" aria-selected="true" aria-controls="deck-out">Sans installation</button>
+        <button type="button" role="tab" id="mode-script" aria-selected="false" aria-controls="deck-out">Avec le script VF</button>
+      </div>
+      <p class="mode-note" id="mode-note"></p>
+      <div class="summary" id="summary" hidden></div>
+      <textarea id="deck-out" readonly spellcheck="false" aria-label="Liste à coller dans drawspell"
+        placeholder="La liste à coller dans drawspell (bouton « Load Deck ») apparaîtra ici."></textarea>
+      <p class="hint" id="out-note" hidden></p>
+      <div class="actions">
+        <button type="button" class="primary" id="copy" disabled>Copier la liste</button>
+        <button type="button" id="download" disabled>Télécharger .txt</button>
+        <span class="spacer"></span>
+        <a class="button" href="https://drawspell.space" target="_blank" rel="noopener">Ouvrir drawspell</a>
+      </div>
+      <p class="copied" id="copied" role="status" hidden></p>
+    </div>
+  </section>
+
+  <div class="progress" id="progress" hidden>
+    <div class="progress-bar"><span id="progress-bar"></span></div>
+    <p id="progress-text" role="status"></p>
+  </div>
+
+  <section class="cards" id="cards" aria-labelledby="cards-title">
+    <div class="cards-head">
+      <h2 id="cards-title">Les cartes</h2>
+      <span class="hint" id="cards-hint">L'image montrée est celle que drawspell affichera.</span>
+    </div>
+    <p class="cards-empty" id="cards-empty">Lance la traduction : chaque carte s'affichera ici avec son nom français, son édition et l'image que tu verras en jeu.</p>
+    <div id="card-groups"></div>
+  </section>
+
+  <section class="script" id="script" aria-labelledby="script-title">
+    <div class="script-head">
+      <span class="step">Option</span>
+      <h2 id="script-title">Le script Drawspell VF</h2>
+      <p>Avec le script, drawspell charge la version française de chaque carte, dans la même édition que la tienne quand elle existe en VF. Il suffit que la personne qui importe le deck l'ait activé : les images VF sont partagées avec tout le monde dans la partie. Utilise ensuite la liste du mode « Avec le script VF ».</p>
+    </div>
+    <div class="methods">
+      <article class="method">
+        <h3>Favori, sur ordinateur</h3>
+        <ol>
+          <li>Affiche la barre de favoris (Ctrl+Maj+B).</li>
+          <li>Glisse ce bouton dedans :</li>
+        </ol>
+        <a class="bookmarklet" id="bookmarklet" href="#" draggable="true">Drawspell VF</a>
+        <ol start="3">
+          <li>Sur drawspell, une fois dans ta partie, clique sur le favori. Une bulle « Drawspell VF · actif » s'affiche.</li>
+          <li>Clique sur « Load Deck » et colle ta liste.</li>
+        </ol>
+        <p>Reclique sur le favori après chaque rechargement de la page.</p>
+      </article>
+      <article class="method">
+        <h3>Extension Tampermonkey</h3>
+        <ol>
+          <li>Installe l'extension Tampermonkey (Chrome, Firefox, Edge, Safari).</li>
+          <li>Ouvre <a href="drawspell-vf.user.js" id="userscript-link">drawspell-vf.user.js</a> et clique sur « Installer ».</li>
+          <li>C'est tout : le script s'active tout seul sur drawspell.</li>
+        </ol>
+        <p>Sur Chrome, active aussi « Autoriser les scripts utilisateur » dans les détails de l'extension. Le script est réglé en français ; pour une autre langue, change la ligne <code>var LANG = 'fr';</code>.</p>
+      </article>
+      <article class="method">
+        <h3>Favori, sur téléphone</h3>
+        <ol>
+          <li>Copie le code du favori :</li>
+        </ol>
+        <button type="button" class="small" id="copy-bookmarklet">Copier le code du favori</button>
+        <ol start="2">
+          <li>Ajoute n'importe quelle page à tes favoris, puis modifie ce favori : nomme-le « Drawspell VF » et remplace son adresse par le code copié.</li>
+          <li>Sur drawspell, tape « Drawspell VF » dans la barre d'adresse et choisis le favori.</li>
+        </ol>
+        <p class="copied" id="copied-bookmarklet" role="status" hidden></p>
+      </article>
+    </div>
+  </section>
+
+  <section class="faq" aria-labelledby="faq-title">
+    <h2 id="faq-title">Questions</h2>
+    <details>
+      <summary>Pourquoi drawspell affiche mes cartes en anglais ?</summary>
+      <p>drawspell demande chaque carte à Scryfall avec son édition et son numéro, et Scryfall renvoie toujours la version anglaise. Quand une ligne ne contient que le nom de la carte, drawspell fait une recherche par nom, et Scryfall reconnaît alors les noms français. C'est ce que fait le mode « Sans installation ».</p>
+    </details>
+    <details>
+      <summary>Pourquoi certaines cartes restent en VO ?</summary>
+      <p>Certains noms français ressemblent trop à un nom anglais (Homicide, Plaine, Réanimation…). Scryfall choisirait alors la carte anglaise, ou même une autre carte. Le site vérifie chaque nom avant de l'écrire : si le résultat n'est pas la bonne carte en français, la ligne reste en anglais, avec ton édition. Le script VF n'a pas ce problème.</p>
+    </details>
+    <details>
+      <summary>Pourquoi l'édition change parfois ?</summary>
+      <p>Avec les noms seuls, Scryfall choisit l'impression française la plus récente de la carte. Avec le script VF, drawspell garde ton édition et ton numéro dès qu'ils existent en français. Sinon, il prend en priorité une impression VF avec la même illustration.</p>
+    </details>
+    <details>
+      <summary>Mes potes verront les cartes en français ?</summary>
+      <p>Oui. drawspell partage l'image de chaque carte avec toute la partie. Seule la personne qui importe le deck a besoin de la liste traduite (ou du script).</p>
+    </details>
+    <details>
+      <summary>Et la ligne « // COMMANDER » de ManaBox ?</summary>
+      <p>drawspell ne la comprend pas : il la prend pour une carte et ajoute « Commandeer » à ton deck. La liste générée utilise les sections que drawspell reconnaît : Commander, Deck et Sideboard. Les cartes de la maybeboard sont retirées.</p>
+    </details>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Données et images des cartes : <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>. Ce site n'est affilié ni à drawspell, ni à ManaBox, ni à Scryfall, ni à Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast.</p>
+  </div>
+</footer>
+
+<!-- Source du script Drawspell VF (copie de drawspell-vf.user.js, synchronisée par tools/embed_userscript.py). -->
+<!-- VF-SCRIPT:BEGIN -->
+<script type="text/plain" id="vf-src">
+// ==UserScript==
+// @name         Drawspell VF
+// @namespace    drawspell-vf
+// @version      1.0.0
+// @description  Charge la version française (VF) des cartes quand tu importes un deck sur drawspell.space. Données et images : Scryfall.
+// @match        https://drawspell.space/*
+// @run-at       document-start
+// @grant        none
+// @sandbox      JavaScript
+// @inject-into  page
+// ==/UserScript==
+
+/*
+ * Drawspell VF
+ * drawspell résout chaque ligne du deck avec l'API Scryfall, qui renvoie toujours la carte anglaise.
+ * Ce script intercepte ces réponses (POST /cards/collection et GET /cards/named) et remplace chaque
+ * carte par son impression dans la langue choisie : même édition et même numéro si elle existe,
+ * sinon la meilleure autre impression traduite. Les autres appels (cache par id, jetons) ne sont pas touchés.
+ * Le code n'utilise pas de commentaires de ligne pour pouvoir servir tel quel de favori (bookmarklet).
+ */
+(function () {
+  'use strict';
+
+  /* Langue des cartes : fr, de, it, es, pt, ja, ko, ru, zhs, zht */
+  var LANG = 'fr';
+
+  var W = window;
+  if (W.__drawspellVF) {
+    W.__drawspellVF.say('déjà actif (' + W.__drawspellVF.lang + ').');
+    return;
+  }
+  if (!/(^|\.)drawspell\.space$/.test(location.hostname)) {
+    alert('Drawspell VF : ouvre d\'abord drawspell.space, puis utilise à nouveau ce favori.');
+    return;
+  }
+
+  var API = 'https://api.scryfall.com';
+  var EXTRA_LAYOUTS = { token: 1, double_faced_token: 1, emblem: 1, art_series: 1, planar: 1, scheme: 1, vanguard: 1 };
+  var MAX_QUERY = 900;
+  var realFetch = W.fetch;
+  var nextSlot = 0;
+  var known = {};
+  var pending = {};
+  var box = null;
+  var hideTimer = 0;
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function oracleOf(card) {
+    return card.oracle_id || (card.card_faces && card.card_faces[0] && card.card_faces[0].oracle_id) || '';
+  }
+
+  function keyOf(card) {
+    return card.set + '/' + card.collector_number;
+  }
+
+  function hasRealImage(card) {
+    return card.image_status === 'highres_scan' || card.image_status === 'lowres';
+  }
+
+  function usable(card) {
+    return !!card && card.object === 'card' && card.lang === LANG && !card.digital &&
+      !EXTRA_LAYOUTS[card.layout] && hasRealImage(card);
+  }
+
+  function wanted(card) {
+    return !!card && card.object === 'card' && card.lang !== LANG && !EXTRA_LAYOUTS[card.layout];
+  }
+
+  function say(message) {
+    try {
+      if (!document.documentElement) return;
+      if (!box) {
+        box = document.createElement('div');
+        box.setAttribute('role', 'status');
+        box.setAttribute('style', [
+          'position:fixed', 'z-index:2147483647', 'left:12px', 'bottom:12px',
+          'max-width:min(380px,calc(100vw - 24px))', 'padding:10px 14px', 'border-radius:10px',
+          'background:#1f2a52', 'color:#fff', 'font:600 13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif',
+          'box-shadow:0 8px 28px rgba(0,0,0,.35)', 'pointer-events:none', 'transition:opacity .4s'
+        ].join(';'));
+      }
+      if (!box.isConnected) (document.body || document.documentElement).appendChild(box);
+      box.textContent = 'Drawspell VF · ' + message;
+      box.style.opacity = '1';
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () { box.style.opacity = '0'; }, 7000);
+    } catch (e) { /* l'affichage est facultatif */ }
+  }
+
+  /* Scryfall : 2 requêtes par seconde maximum sur /cards/search. Un 429 arrive sans en-tête CORS,
+     donc fetch échoue avec une TypeError : on attend alors 60 s avant de réessayer. */
+  async function getJson(url) {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      var now = Date.now();
+      var at = Math.max(now, nextSlot);
+      nextSlot = at + 550;
+      if (at > now) await sleep(at - now);
+      var res;
+      try {
+        res = await realFetch.call(W, url, { headers: { Accept: 'application/json' } });
+      } catch (e) {
+        say('Scryfall demande une pause, nouvel essai dans 60 s…');
+        await sleep(60000);
+        continue;
+      }
+      if (res.status === 429) {
+        say('Scryfall demande une pause, nouvel essai dans 60 s…');
+        await sleep(60000);
+        continue;
+      }
+      if (!res.ok) return null;
+      return res.json();
+    }
+    return null;
+  }
+
+  async function search(query, params) {
+    var url = API + '/cards/search?unique=prints' + (params || '') + '&q=' + encodeURIComponent(query);
+    var out = [];
+    while (url) {
+      var page = await getJson(url);
+      if (!page || !Array.isArray(page.data)) break;
+      out = out.concat(page.data);
+      url = page.has_more ? page.next_page : null;
+    }
+    return out;
+  }
+
+  function buildQueries(terms, prefix, suffix) {
+    var queries = [];
+    var group = [];
+    var length = prefix.length + suffix.length;
+    terms.forEach(function (term) {
+      if (group.length && length + term.length + 4 > MAX_QUERY) {
+        queries.push(prefix + group.join(' or ') + suffix);
+        group = [];
+        length = prefix.length + suffix.length;
+      }
+      group.push(term);
+      length += term.length + 4;
+    });
+    if (group.length) queries.push(prefix + group.join(' or ') + suffix);
+    return queries;
+  }
+
+  /* Ordre de préférence quand la même édition n'existe pas dans la langue voulue :
+     même illustration, scan haute définition, déjà sortie, puis la plus récente. */
+  function pickBest(candidates, reference) {
+    var day = today();
+    var illustration = reference && reference.illustration_id;
+    function score(card) {
+      return [
+        illustration && card.illustration_id === illustration ? 0 : 1,
+        card.image_status === 'highres_scan' ? 0 : 1,
+        card.released_at && card.released_at > day ? 1 : 0
+      ];
+    }
+    return candidates.filter(usable).sort(function (a, b) {
+      var sa = score(a);
+      var sb = score(b);
+      for (var i = 0; i < sa.length; i++) {
+        if (sa[i] !== sb[i]) return sa[i] - sb[i];
+      }
+      return a.released_at < b.released_at ? 1 : a.released_at > b.released_at ? -1 : 0;
+    })[0] || null;
+  }
+
+  async function localizeAll(cards) {
+    var todo = [];
+    var seen = {};
+    cards.forEach(function (card) {
+      var key = keyOf(card);
+      if (!(key in known) && !seen[key]) {
+        seen[key] = 1;
+        todo.push(card);
+      }
+    });
+    if (!todo.length) return;
+
+    var exact = {};
+    var printQueries = buildQueries(todo.map(function (card) {
+      return 'set:' + card.set + ' cn:"' + card.collector_number + '"';
+    }), 'lang:' + LANG + ' (', ')');
+    for (var i = 0; i < printQueries.length; i++) {
+      (await search(printQueries[i], '&include_extras=true&include_variations=true')).forEach(function (card) {
+        exact[keyOf(card)] = card;
+      });
+    }
+
+    var misses = [];
+    todo.forEach(function (card) {
+      var match = exact[keyOf(card)];
+      if (usable(match)) known[keyOf(card)] = match;
+      else misses.push(card);
+    });
+    if (!misses.length) return;
+
+    var oracles = [];
+    misses.forEach(function (card) {
+      var oracle = oracleOf(card);
+      if (oracle && oracles.indexOf(oracle) < 0) oracles.push(oracle);
+    });
+    var others = [];
+    var oracleQueries = buildQueries(oracles.map(function (oracle) {
+      return 'oracleid:' + oracle;
+    }), 'lang:' + LANG + ' -is:digital (', ')');
+    for (var j = 0; j < oracleQueries.length; j++) {
+      others = others.concat(await search(oracleQueries[j], '&order=released&dir=desc'));
+    }
+    misses.forEach(function (card) {
+      var oracle = oracleOf(card);
+      known[keyOf(card)] = pickBest(others.filter(function (other) { return oracleOf(other) === oracle; }), card);
+    });
+  }
+
+  /* Les objets VF de Scryfall n'ont pas de all_parts : on garde ceux de la carte anglaise
+     pour que le menu « cartes liées » de drawspell propose toujours les jetons. */
+  function withParts(localized, english) {
+    if (localized && english && english.all_parts && !localized.all_parts) {
+      return Object.assign({}, localized, { all_parts: english.all_parts });
+    }
+    return localized;
+  }
+
+  function jsonResponse(res, body) {
+    return new Response(JSON.stringify(body), {
+      status: res.status,
+      statusText: res.statusText,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  function sameText(a, b) {
+    return String(a).toLowerCase() === String(b).toLowerCase();
+  }
+
+  async function onCollection(res, init) {
+    if (!res.ok) return res;
+    try {
+      var identifiers = [];
+      try {
+        identifiers = JSON.parse((init && typeof init.body === 'string' && init.body) || '{}').identifiers || [];
+      } catch (e) { identifiers = []; }
+      /* Le cache de drawspell interroge /cards/collection par id : ces réponses doivent rester intactes. */
+      if (!identifiers.length || identifiers.some(function (id) { return !id.name && !id.collector_number; })) return res;
+
+      var body = await res.clone().json();
+      if (!body || !Array.isArray(body.data)) return res;
+      var targets = body.data.filter(wanted);
+      if (!targets.length) return res;
+
+      say('recherche des cartes en VF…');
+      await localizeAll(targets);
+
+      var translated = 0;
+      var original = 0;
+      var data = [];
+      body.data.forEach(function (card) {
+        if (!wanted(card)) { data.push(card); return; }
+        var localized = withParts(known[keyOf(card)], card);
+        if (!localized) { original++; data.push(card); return; }
+        translated++;
+        if (localized.set === card.set && localized.collector_number === card.collector_number) {
+          data.push(localized);
+          return;
+        }
+        /* Impression traduite d'une autre édition : drawspell compare l'édition et le numéro demandés.
+           On retire la carte de la réponse ; drawspell la redemande par son nom (/cards/named),
+           et onNamed renvoie alors cette impression. */
+        var requestedByPrint = identifiers.some(function (id) {
+          return id.set && id.collector_number && sameText(id.set, card.set) && sameText(id.collector_number, card.collector_number);
+        });
+        if (requestedByPrint) pending[oracleOf(card)] = localized;
+        else data.push(localized);
+      });
+      body.data = data;
+      say(translated + ' carte(s) en VF' + (original ? ', ' + original + ' sans version traduite (restent en VO)' : '') + '.');
+      return jsonResponse(res, body);
+    } catch (e) {
+      console.warn('[Drawspell VF]', e);
+      return res;
+    }
+  }
+
+  async function onNamed(res) {
+    if (!res.ok) return res;
+    try {
+      var card = await res.clone().json();
+      if (!wanted(card)) return res;
+      var localized = pending[oracleOf(card)];
+      if (!localized) {
+        await localizeAll([card]);
+        localized = known[keyOf(card)];
+      }
+      if (!localized) return res;
+      return jsonResponse(res, withParts(localized, card));
+    } catch (e) {
+      console.warn('[Drawspell VF]', e);
+      return res;
+    }
+  }
+
+  W.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var request = realFetch.call(W, input, init);
+    if (url.indexOf(API + '/cards/collection') === 0) {
+      return request.then(function (res) { return onCollection(res, init); });
+    }
+    if (url.indexOf(API + '/cards/named') === 0) {
+      return request.then(onNamed);
+    }
+    return request;
+  };
+
+  W.__drawspellVF = { lang: LANG, say: say };
+
+  function announce() {
+    say('actif (' + LANG + '). Importe ton deck avec « Load Deck ».');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', announce);
+  else announce();
+})();
+</script>
+<!-- VF-SCRIPT:END -->
+
+<script>
+(() => {
+'use strict';
+
+const API = 'https://api.scryfall.com';
+const LANGS = [
+  ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'], ['es', 'Español'], ['pt', 'Português'],
+  ['ja', '日本語'], ['ko', '한국어'], ['ru', 'Русский'], ['zhs', '简体中文'], ['zht', '繁體中文'],
+];
+const EXTRA_LAYOUTS = new Set(['token', 'double_faced_token', 'emblem', 'art_series', 'planar', 'scheme', 'vanguard']);
+const MAX_QUERY = 900;
+const SLOW_ENDPOINT = /\/cards\/(search|named|collection|random)/;
+const SECTION_LABELS = { commander: 'Commandant', deck: 'Deck', sideboard: 'Réserve' };
+const OUTPUT_HEADERS = { commander: 'Commander', deck: 'Deck', sideboard: 'Sideboard' };
+const EXAMPLE = [
+  '// COMMANDER',
+  "1 Victor, Valgavoth's Seneschal (DSK) 238",
+  '',
+  '1 Murder (DSK) 110',
+  '1 Sol Ring (MSC) 211',
+  '1 Defiled Crypt // Cadaver Lab (DSK) 91',
+  '1 Fear of the Dark (DSK) 98',
+  '1 Evolving Wilds (IKO) 247',
+  '10 Plains (DSK) 272',
+  '9 Swamp (DSK) 282',
+].join('\n');
+const REASONS = {
+  'same-name': 'Le nom traduit est identique au nom anglais : drawspell chargerait la carte anglaise.',
+  'wrong-card': 'Scryfall confond le nom traduit avec une autre carte : la ligne reste en anglais pour éviter une erreur.',
+  'english': 'Pour ce nom traduit, Scryfall renvoie la version anglaise.',
+  'ambiguous': 'Pour Scryfall, ce nom traduit ressemble à plusieurs cartes.',
+  'no-image': "L'impression traduite n'a pas encore de vraie image.",
+  'unsafe': 'Ce nom traduit serait mal lu par drawspell.',
+};
+
+const $ = (selector) => document.querySelector(selector);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+class Cancelled extends Error {}
+class ScryfallError extends Error {}
+
+/* ---------- Stockage local (cache Scryfall et préférences) ---------- */
+
+const store = {
+  prefix: 'dsvf1:',
+  ttl: 3 * 24 * 3600 * 1000,
+  get(key) {
+    try {
+      const raw = localStorage.getItem(this.prefix + key);
+      if (raw === null) return undefined;
+      const item = JSON.parse(raw);
+      if (!item || Date.now() - item.t > this.ttl) {
+        localStorage.removeItem(this.prefix + key);
+        return undefined;
+      }
+      return item.v;
+    } catch {
+      return undefined;
+    }
+  },
+  set(key, value) {
+    const raw = JSON.stringify({ t: Date.now(), v: value });
+    try {
+      localStorage.setItem(this.prefix + key, raw);
+    } catch {
+      this.clear();
+      try { localStorage.setItem(this.prefix + key, raw); } catch { /* stockage indisponible */ }
+    }
+  },
+  clear() {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(this.prefix)) localStorage.removeItem(key);
+      }
+    } catch { /* stockage indisponible */ }
+  },
+};
+
+const prefs = {
+  get(key, fallback) {
+    try {
+      const value = localStorage.getItem('dsvf-pref:' + key);
+      return value === null ? fallback : value;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try { localStorage.setItem('dsvf-pref:' + key, value); } catch { /* stockage indisponible */ }
+  },
+};
+
+/* ---------- Lecture de la liste ---------- */
+
+const HEADER_WORDS = {
+  commander: 'commander', commanders: 'commander', commandant: 'commander', commandants: 'commander',
+  cmdr: 'commander', oathbreaker: 'commander', 'signature spell': 'commander', 'signature spells': 'commander',
+  deck: 'deck', main: 'deck', maindeck: 'deck', 'main deck': 'deck', mainboard: 'deck', decklist: 'deck',
+  sideboard: 'sideboard', side: 'sideboard', sb: 'sideboard', 'réserve': 'sideboard', reserve: 'sideboard',
+  companion: 'companion', companions: 'companion', compagnon: 'companion',
+  maybeboard: 'maybe', maybe: 'maybe', considering: 'maybe', wishlist: 'maybe',
+  tokens: 'drop', token: 'drop', about: 'drop',
+  creature: 'deck', creatures: 'deck', land: 'deck', lands: 'deck', instant: 'deck', instants: 'deck',
+  sorcery: 'deck', sorceries: 'deck', artifact: 'deck', artifacts: 'deck', enchantment: 'deck',
+  enchantments: 'deck', planeswalker: 'deck', planeswalkers: 'deck', battle: 'deck', battles: 'deck',
+  spells: 'deck', other: 'deck',
+};
+
+function headerOf(line) {
+  const marked = line.match(/^(?:\/\/+|#+|={2,})\s*(.*?)\s*=*\s*$/);
+  let text = marked ? marked[1] : line;
+  if (marked) text = text.replace(/^\d+\s+/, '');
+  text = text.replace(/\s*\(\d+\)\s*$/, '').replace(/:\s*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(HEADER_WORDS, text)) return HEADER_WORDS[text];
+  return marked ? 'deck' : null;
+}
+
+function normalizeName(name) {
+  return name.split(/\s*\/{1,2}\s*/).map((part) => part.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' // ');
+}
+
+function archidektRole(categories) {
+  const first = (categories.split(',')[0] || '').trim();
+  const label = first.replace(/\{[^}]*\}/g, '').trim().toLowerCase();
+  if (/\{top\}/i.test(first) || label === 'commander') return 'commander';
+  if (/\{nodeck\}/i.test(first) || label === 'maybeboard') return 'maybe';
+  if (label === 'sideboard') return 'sideboard';
+  return null;
+}
+
+function parseCardLine(line) {
+  let text = line.replace(/\s*<[^>]*>/g, '').trim();
+  let qty = 1;
+  const quantity = text.match(/^(?:(\d+)\s*[xX]?|[xX]\s*(\d+))\s+(.+)$/);
+  if (quantity) {
+    qty = parseInt(quantity[1] || quantity[2], 10);
+    text = quantity[3];
+  }
+  let foil = '';
+  let role = null;
+  for (let guard = 0; guard < 12; guard++) {
+    let m;
+    if ((m = text.match(/\s+\^[^^]*\^$/))) { text = text.slice(0, m.index); continue; }
+    if ((m = text.match(/\s+\[([^\]]*)\]$/)) && !/^[A-Z0-9]{3,6}$/.test(m[1])) {
+      role = role || archidektRole(m[1]);
+      text = text.slice(0, m.index);
+      continue;
+    }
+    if ((m = text.match(/\s+#\S*$/))) { text = text.slice(0, m.index); continue; }
+    if ((m = text.match(/\s+\*([A-Za-z]+)\*$/))) {
+      const tag = m[1].toUpperCase();
+      if (tag === 'F') foil = 'foil';
+      else if (tag === 'E') foil = 'etched';
+      else if (tag === 'CMDR') role = 'commander';
+      else if (tag === 'CMPN') role = 'companion';
+      text = text.slice(0, m.index);
+      continue;
+    }
+    if ((m = text.match(/\s+\(([A-Z]{1,2})\)$/))) {
+      if (m[1].includes('F')) foil = 'foil';
+      text = text.slice(0, m.index);
+      continue;
+    }
+    break;
+  }
+  let name = text;
+  let set = '';
+  let cn = '';
+  let m = text.match(/^(.*?)\s+\(([A-Za-z0-9]{3,6})\)(?:\s+([^\s()[\]]+?))?(?:\s+([FE]))?$/);
+  if (m && m[1]) {
+    name = m[1];
+    set = m[2];
+    cn = m[3] || '';
+    if (m[4]) foil = m[4] === 'F' ? 'foil' : 'etched';
+  } else if ((m = text.match(/^(.*?)\s+\[([A-Z0-9]{3,6})\]$/)) && m[1]) {
+    name = m[1];
+    set = m[2];
+  }
+  name = normalizeName(name);
+  if (!name || !qty) return null;
+  return { qty, name, set: set.toLowerCase(), cn, foil, role };
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((cell) => cell.trim()));
+}
+
+function parseCsv(text) {
+  const rows = parseCsvRows(text);
+  const head = rows.shift().map((h) => h.trim().toLowerCase());
+  const col = (...names) => head.findIndex((h) => names.includes(h));
+  const iName = col('name', 'card name');
+  const iSet = col('set code');
+  const iCn = col('collector number', 'card number');
+  const iQty = col('quantity', 'count', 'qty');
+  const iFoil = col('foil');
+  const entries = [];
+  for (const row of rows) {
+    const name = normalizeName(row[iName] || '');
+    if (!name) continue;
+    const qty = iQty >= 0 ? parseInt(row[iQty], 10) || 1 : 1;
+    const foil = iFoil >= 0 && /foil|etched/i.test(row[iFoil] || '') ? row[iFoil].toLowerCase() : '';
+    entries.push({
+      qty, name, foil, role: null,
+      set: iSet >= 0 ? (row[iSet] || '').trim().toLowerCase() : '',
+      cn: iCn >= 0 ? (row[iCn] || '').trim() : '',
+      section: 'deck',
+      raw: row.join(','),
+    });
+  }
+  return { entries, ignored: [] };
+}
+
+function parseDeck(input) {
+  const text = input.replace(/^﻿/, '').replace(/ /g, ' ');
+  const firstLine = text.split(/\r\n|\n|\r/).find((line) => line.trim()) || '';
+  if (/(^|,)\s*"?name"?\s*,/i.test(firstLine) && /set code|collector number/i.test(firstLine)) return parseCsv(text);
+
+  const entries = [];
+  const ignored = [];
+  let section = 'deck';
+  let cardsInSection = 0;
+  for (const rawLine of text.split(/\r\n|\n|\r/)) {
+    let line = rawLine.trim();
+    if (!line) {
+      /* ManaBox : une ligne vide sépare le commandant du reste du deck, qui n'a pas d'en-tête. */
+      if ((section === 'commander' || section === 'companion') && cardsInSection > 0) {
+        section = 'deck';
+        cardsInSection = 0;
+      }
+      continue;
+    }
+    let forced = null;
+    const sideboardPrefix = line.match(/^SB:\s*/i);
+    if (sideboardPrefix) {
+      forced = 'sideboard';
+      line = line.slice(sideboardPrefix[0].length);
+    } else {
+      const header = headerOf(line);
+      if (header) {
+        section = header;
+        cardsInSection = 0;
+        continue;
+      }
+      if (section === 'drop' && /^name\s/i.test(line)) continue;
+    }
+    const card = parseCardLine(line);
+    if (!card) continue;
+    card.section = forced || card.role || section;
+    card.raw = rawLine.trim();
+    cardsInSection++;
+    if (card.section === 'maybe' || card.section === 'drop') ignored.push(card);
+    else entries.push(card);
+  }
+  return { entries, ignored };
+}
+
+/* ---------- Scryfall ---------- */
+
+let nextSlot = 0;
+
+async function coolDown(seconds, ctx) {
+  nextSlot = Date.now() + seconds * 1000;
+  for (let left = seconds; left > 0; left--) {
+    if (ctx.isCancelled()) throw new Cancelled();
+    ctx.onPause(left);
+    await sleep(1000);
+  }
+}
+
+/* Scryfall limite /cards/search, /cards/named et /cards/collection à 2 requêtes par seconde.
+   Un refus (429) arrive sans en-tête CORS : le navigateur le signale comme une erreur réseau. */
+async function scryfall(path, ctx, body) {
+  const url = path.startsWith('http') ? path : API + path;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const now = Date.now();
+    const at = Math.max(now, nextSlot);
+    nextSlot = at + (SLOW_ENDPOINT.test(url) ? 550 : 120);
+    if (at > now) await sleep(at - now);
+    if (ctx.isCancelled()) throw new Cancelled();
+    let res;
+    try {
+      res = await fetch(url, body
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) }
+        : { headers: { Accept: 'application/json' } });
+    } catch {
+      if (navigator.onLine === false) throw new ScryfallError('Pas de connexion internet. Reconnecte-toi puis relance la traduction.');
+      await coolDown(60, ctx);
+      continue;
+    }
+    if (ctx.isCancelled()) throw new Cancelled();
+    if (res.status === 429) {
+      await coolDown(Number(res.headers.get('Retry-After')) || 60, ctx);
+      continue;
+    }
+    let json = null;
+    try { json = await res.json(); } catch { json = null; }
+    if (res.status === 404) return null;
+    if (!res.ok) throw new ScryfallError((json && json.details) || `Scryfall a répondu ${res.status}.`);
+    return json;
+  }
+  throw new ScryfallError('Scryfall ne répond pas pour le moment. Réessaie dans quelques minutes.');
+}
+
+async function searchAll(query, params, ctx) {
+  let url = `${API}/cards/search?unique=prints${params}&q=${encodeURIComponent(query)}`;
+  const cards = [];
+  while (url) {
+    let page;
+    try {
+      page = await scryfall(url, ctx);
+    } catch (err) {
+      if (err instanceof ScryfallError && !/connexion|répond pas/.test(err.message)) {
+        console.warn('Recherche Scryfall ignorée :', query, err.message);
+        break;
+      }
+      throw err;
+    }
+    if (!page || !Array.isArray(page.data)) break;
+    cards.push(...page.data);
+    url = page.has_more ? page.next_page : null;
+  }
+  return cards;
+}
+
+function buildQueries(terms, prefix, suffix) {
+  const queries = [];
+  let group = [];
+  let length = prefix.length + suffix.length;
+  for (const term of terms) {
+    if (group.length && length + term.length + 4 > MAX_QUERY) {
+      queries.push(prefix + group.join(' or ') + suffix);
+      group = [];
+      length = prefix.length + suffix.length;
+    }
+    group.push(term);
+    length += term.length + 4;
+  }
+  if (group.length) queries.push(prefix + group.join(' or ') + suffix);
+  return queries;
+}
+
+function oracleOf(card) {
+  return card.oracle_id || (card.card_faces && card.card_faces[0] && card.card_faces[0].oracle_id) || '';
+}
+
+function localizedName(card) {
+  if (card.printed_name) return card.printed_name;
+  const faces = Array.isArray(card.card_faces) ? card.card_faces : [];
+  if (!faces.length) return card.name;
+  const names = faces.map((face) => face.printed_name || face.name);
+  if (names.every((n) => n === names[0]) && names[0].includes('//')) return names[0];
+  return names.join(' // ');
+}
+
+function slim(card) {
+  if (!card) return null;
+  const faces = Array.isArray(card.card_faces) ? card.card_faces : [];
+  const pickImage = (uris) => (uris ? { small: uris.small, normal: uris.normal } : null);
+  return {
+    id: card.id,
+    oracle_id: oracleOf(card),
+    illustration_id: card.illustration_id || (faces[0] && faces[0].illustration_id) || '',
+    name: card.name,
+    faces: faces.map((face) => face.name),
+    loc: localizedName(card),
+    locFront: faces[0] ? faces[0].printed_name || '' : '',
+    lang: card.lang,
+    set: card.set,
+    setName: card.set_name || '',
+    cn: card.collector_number,
+    layout: card.layout,
+    released: card.released_at || '',
+    digital: !!card.digital,
+    imageStatus: card.image_status || '',
+    uri: card.scryfall_uri || '',
+    img: pickImage(card.image_uris) || pickImage(faces[0] && faces[0].image_uris),
+  };
+}
+
+function hasRealImage(card) {
+  const status = card.imageStatus !== undefined ? card.imageStatus : card.image_status;
+  return status === 'highres_scan' || status === 'lowres';
+}
+
+function usable(card, lang) {
+  return !!card && card.lang === lang && !card.digital && !EXTRA_LAYOUTS.has(card.layout) && hasRealImage(card);
+}
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/* Même règle que le script : même illustration, scan haute définition, déjà sortie, puis la plus récente. */
+function pickBest(candidates, reference, lang) {
+  const day = today();
+  const illustration = reference && reference.illustration_id;
+  const score = (card) => [
+    illustration && card.illustration_id === illustration ? 0 : 1,
+    card.imageStatus === 'highres_scan' ? 0 : 1,
+    card.released && card.released > day ? 1 : 0,
+  ];
+  return candidates.filter((card) => usable(card, lang)).sort((a, b) => {
+    const sa = score(a);
+    const sb = score(b);
+    for (let i = 0; i < sa.length; i++) if (sa[i] !== sb[i]) return sa[i] - sb[i];
+    return a.released < b.released ? 1 : a.released > b.released ? -1 : 0;
+  })[0] || null;
+}
+
+/* Copie de la comparaison de noms de drawspell (fonctions W et Ue de son module d'import). */
+function drawspellKey(name) {
+  return name.toLowerCase().replace(/\s*\/\/\s*/g, '/').replace(/\s*\/\s*/g, '/').trim();
+}
+function drawspellNameMatch(requested, card) {
+  const key = drawspellKey(requested);
+  if (drawspellKey(card.name) === key) return true;
+  if ((card.card_faces || []).some((face) => face.name && drawspellKey(face.name) === key)) return true;
+  return drawspellKey((card.name.split('//')[0] || '').trim()) === key;
+}
+
+function samePrint(card, set, cn) {
+  return card.set.toLowerCase() === set && (card.collector_number === cn || card.collector_number.toLowerCase() === cn.toLowerCase());
+}
+
+/* ---------- Étape A : la carte anglaise (ton impression) ---------- */
+
+async function collectionLookup(groups, identify, matches, ctx) {
+  for (let i = 0; i < groups.length; i += 75) {
+    const chunk = groups.slice(i, i + 75);
+    const res = await scryfall('/cards/collection', ctx, { identifiers: chunk.map(identify) });
+    const data = (res && res.data) || [];
+    for (const group of chunk) {
+      const hit = data.find((card) => matches(group, card));
+      if (hit) group.card = slim(hit);
+    }
+  }
+}
+
+async function resolveEnglish(entries, ctx) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = entry.set && entry.cn ? `p|${entry.set}|${entry.cn}`
+      : entry.set ? `s|${entry.set}|${entry.name.toLowerCase()}`
+      : `n|${entry.name.toLowerCase()}`;
+    if (!groups.has(key)) groups.set(key, { key, kind: key[0], name: entry.name, set: entry.set, cn: entry.cn, card: null, note: '', entries: [] });
+    groups.get(key).entries.push(entry);
+  }
+  const todo = [];
+  for (const group of groups.values()) {
+    const cached = store.get('en|' + group.key);
+    if (cached) { group.card = cached.card; group.note = cached.note; }
+    else todo.push(group);
+  }
+
+  await collectionLookup(todo,
+    (g) => (g.kind === 'p' ? { set: g.set, collector_number: g.cn } : g.kind === 's' ? { name: g.name, set: g.set } : { name: g.name }),
+    (g, card) => (g.kind === 'p' ? samePrint(card, g.set, g.cn)
+      : g.kind === 's' ? card.set === g.set && drawspellNameMatch(g.name, card)
+      : drawspellNameMatch(g.name, card)),
+    ctx);
+
+  const byName = todo.filter((g) => !g.card && g.kind !== 'n');
+  byName.forEach((g) => { g.note = 'print-unknown'; });
+  await collectionLookup(byName, (g) => ({ name: g.name }), (g, card) => drawspellNameMatch(g.name, card), ctx);
+
+  for (const group of todo.filter((g) => !g.card)) {
+    const card = await scryfall(`/cards/named?fuzzy=${encodeURIComponent(group.name)}`, ctx);
+    if (card && card.object === 'card') {
+      group.card = slim(card);
+      group.note = 'fuzzy';
+    }
+  }
+
+  for (const group of todo) if (group.card) store.set('en|' + group.key, { card: group.card, note: group.note });
+  for (const group of groups.values()) {
+    for (const entry of group.entries) {
+      entry.en = group.card;
+      entry.enNote = group.note;
+    }
+  }
+}
+
+/* ---------- Étape B : l'impression traduite (même édition, sinon la meilleure autre) ---------- */
+
+async function resolveLocalized(entries, lang, ctx) {
+  const prints = new Map();
+  for (const entry of entries) {
+    if (!entry.en) continue;
+    const key = `${entry.en.set}/${entry.en.cn}`;
+    if (!prints.has(key)) prints.set(key, { key, en: entry.en, loc: null });
+  }
+  const todo = [];
+  for (const print of prints.values()) {
+    if (usable(print.en, lang)) { print.loc = print.en; continue; }
+    const cached = store.get(`loc|${lang}|${print.key}`);
+    if (cached !== undefined) print.loc = cached;
+    else todo.push(print);
+  }
+
+  if (todo.length) {
+    const exact = new Map();
+    const printQueries = buildQueries(todo.map((p) => `set:${p.en.set} cn:"${p.en.cn}"`), `lang:${lang} (`, ')');
+    for (const query of printQueries) {
+      for (const card of await searchAll(query, '&include_extras=true&include_variations=true', ctx)) {
+        exact.set(`${card.set}/${card.collector_number}`, slim(card));
+      }
+    }
+    const misses = [];
+    for (const print of todo) {
+      const card = exact.get(print.key);
+      if (usable(card, lang)) print.loc = card;
+      else misses.push(print);
+    }
+    if (misses.length) {
+      ctx.onStep('Recherche des autres impressions traduites…');
+      const oracles = [...new Set(misses.map((p) => p.en.oracle_id).filter(Boolean))];
+      const others = [];
+      for (const query of buildQueries(oracles.map((o) => `oracleid:${o}`), `lang:${lang} -is:digital (`, ')')) {
+        for (const card of await searchAll(query, '&order=released&dir=desc', ctx)) others.push(slim(card));
+      }
+      for (const print of misses) {
+        print.loc = pickBest(others.filter((card) => card.oracle_id === print.en.oracle_id), print.en, lang);
+      }
+    }
+    for (const print of todo) store.set(`loc|${lang}|${print.key}`, print.loc || null);
+  }
+
+  for (const entry of entries) {
+    const print = entry.en ? prints.get(`${entry.en.set}/${entry.en.cn}`) : null;
+    entry.loc = print ? print.loc : null;
+    entry.locSame = !!(entry.loc && entry.loc.set === entry.en.set && entry.loc.cn === entry.en.cn);
+  }
+}
+
+/* ---------- Étape C : vérifier que drawspell lira bien chaque nom traduit ---------- */
+
+function foldName(name) {
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+/* drawspell lit « 1 Nom (SET) 123 » comme une édition et prend « Commander », « Deck »… pour des sections. */
+function breaksDrawspellLine(name) {
+  return /\(([a-zA-Z0-9]{3,})\)\s+\S/.test(name)
+    || /^(commander|deck|sideboard)(:|$)/i.test(name)
+    || /^(companion|maybeboard|about)$/i.test(name)
+    || /^(name|about)\s/i.test(name);
+}
+
+function candidatesFor(entry) {
+  const list = [];
+  const add = (value) => {
+    const name = (value || '').replace(/\s+/g, ' ').trim();
+    if (name && !list.includes(name)) list.push(name);
+  };
+  add(entry.loc.loc);
+  if (entry.loc.faces.length > 1 && entry.loc.layout !== 'split') add(entry.loc.locFront);
+  return list;
+}
+
+async function checkCandidates(pairs, lang, ctx, onDone) {
+  const results = new Map();
+  const todo = [];
+  for (const pair of pairs) {
+    const key = `${pair.oracle}|${pair.name}`;
+    if (results.has(key)) continue;
+    if (foldName(pair.name) === foldName(pair.english)) { results.set(key, { ok: false, reason: 'same-name' }); continue; }
+    if (breaksDrawspellLine(pair.name)) { results.set(key, { ok: false, reason: 'unsafe' }); continue; }
+    const cached = store.get(`chk|${lang}|${key}`);
+    if (cached) { results.set(key, cached); continue; }
+    results.set(key, null);
+    todo.push(pair);
+  }
+  pairs.forEach((pair) => { const r = results.get(`${pair.oracle}|${pair.name}`); if (r) onDone(pair, r); });
+  if (!todo.length) return results;
+
+  /* drawspell envoie d'abord le nom à /cards/collection : un nom anglais identique gagne. */
+  const names = [...new Set(todo.map((pair) => pair.name))];
+  const collisions = new Map();
+  for (let i = 0; i < names.length; i += 75) {
+    const chunk = names.slice(i, i + 75);
+    const res = await scryfall('/cards/collection', ctx, { identifiers: chunk.map((name) => ({ name })) });
+    for (const card of (res && res.data) || []) {
+      for (const name of chunk) if (!collisions.has(name) && drawspellNameMatch(name, card)) collisions.set(name, card);
+    }
+  }
+
+  /* Puis /cards/named?exact (jamais trouvé pour un nom traduit absent de collection), puis ?fuzzy. */
+  const fuzzy = new Map();
+  for (const pair of todo) {
+    const key = `${pair.oracle}|${pair.name}`;
+    let result;
+    const collision = collisions.get(pair.name);
+    if (collision) {
+      result = { ok: false, reason: oracleOf(collision) === pair.oracle ? 'english' : 'wrong-card' };
+    } else {
+      if (!fuzzy.has(pair.name)) fuzzy.set(pair.name, await scryfall(`/cards/named?fuzzy=${encodeURIComponent(pair.name)}`, ctx));
+      const card = fuzzy.get(pair.name);
+      if (!card || card.object !== 'card') result = { ok: false, reason: 'ambiguous' };
+      else if (oracleOf(card) !== pair.oracle) result = { ok: false, reason: 'wrong-card' };
+      else if (card.lang !== lang) result = { ok: false, reason: 'english' };
+      else if (!hasRealImage(card)) result = { ok: false, reason: 'no-image' };
+      else result = { ok: true, card: slim(card) };
+    }
+    store.set(`chk|${lang}|${key}`, result);
+    results.set(key, result);
+    onDone(pair, result);
+  }
+  return results;
+}
+
+async function verifyNames(ctx) {
+  const lang = state.lang;
+  const targets = state.entries.filter((entry) => entry.en && entry.loc && entry.loc.lang === lang);
+  for (const entry of state.entries) entry.check = null;
+  for (const entry of targets) {
+    entry.cands = candidatesFor(entry);
+    entry.check = { state: 'pending' };
+  }
+  renderCards();
+  renderOutput();
+
+  /* 1er passage : le nom traduit complet. 2e passage, pour les recto verso qui ont échoué : la face avant seule. */
+  for (let pass = 0; pass < 2; pass++) {
+    for (const entry of targets) {
+      if (entry.check.state === 'pending' && !entry.cands[pass]) {
+        entry.check = { state: 'fail', reason: entry.check.reason || 'ambiguous' };
+        renderCard(entry);
+      }
+    }
+    const pairs = targets
+      .filter((entry) => entry.check.state === 'pending')
+      .map((entry) => ({ entry, name: entry.cands[pass], oracle: entry.en.oracle_id, english: entry.en.name }));
+    if (!pairs.length) continue;
+    const total = new Set(pairs.map((p) => `${p.oracle}|${p.name}`)).size;
+    const counted = new Set();
+    await checkCandidates(pairs, lang, ctx, (pair, result) => {
+      const key = `${pair.oracle}|${pair.name}`;
+      counted.add(key);
+      for (const p of pairs) {
+        if (p.name !== pair.name || p.oracle !== pair.oracle) continue;
+        const firstReason = p.entry.check.reason;
+        if (result.ok) p.entry.check = { state: 'ok', name: p.name, card: result.card };
+        else if (pass === 0 && p.entry.cands[1]) p.entry.check = { state: 'pending', reason: result.reason };
+        else p.entry.check = { state: 'fail', reason: firstReason || result.reason };
+        renderCard(p.entry);
+      }
+      ctx.onProgress(0.45 + 0.55 * (counted.size / total), pass === 0
+        ? `Vérification des noms dans drawspell : ${counted.size} / ${total}`
+        : `Deuxième essai pour les cartes recto verso : ${counted.size} / ${total}`);
+      renderSummary();
+    });
+  }
+  state.namesDone = true;
+}
+
+/* ---------- Construction de la liste pour drawspell ---------- */
+
+function englishLine(entry) {
+  if (entry.en) return `${entry.en.name} (${entry.en.set.toUpperCase()}) ${entry.en.cn}`;
+  return entry.set && entry.cn ? `${entry.name} (${entry.set.toUpperCase()}) ${entry.cn}` : entry.name;
+}
+
+function lineFor(entry, mode) {
+  if (mode === 'names' && entry.check && entry.check.state === 'ok') return entry.check.name;
+  return englishLine(entry);
+}
+
+function buildOutput(mode) {
+  const sections = { commander: [], deck: [], sideboard: [] };
+  for (const entry of state.entries) {
+    const section = entry.section === 'companion' ? 'sideboard' : entry.section;
+    /* Une carte que Scryfall ne trouve pas ferait échouer tout l'import dans drawspell : on la retire. */
+    if (!sections[section] || entry.en === null) continue;
+    const text = lineFor(entry, mode);
+    const existing = sections[section].find((line) => line.text === text);
+    if (existing) existing.qty += entry.qty;
+    else sections[section].push({ qty: entry.qty, text });
+  }
+  return Object.keys(sections)
+    .filter((section) => sections[section].length)
+    .map((section) => [OUTPUT_HEADERS[section], ...sections[section].map((line) => `${line.qty} ${line.text}`)].join('\n'))
+    .join('\n\n');
+}
+
+/* ---------- Affichage ---------- */
+
+const state = {
+  entries: [],
+  ignored: [],
+  lang: 'fr',
+  mode: 'names',
+  runId: 0,
+  resolved: false,
+  namesDone: false,
+  running: false,
+};
+
+const els = {
+  deckIn: $('#deck-in'),
+  deckOut: $('#deck-out'),
+  file: $('#deck-file'),
+  lang: $('#lang'),
+  run: $('#run'),
+  error: $('#error'),
+  modeNames: $('#mode-names'),
+  modeScript: $('#mode-script'),
+  modeNote: $('#mode-note'),
+  summary: $('#summary'),
+  copy: $('#copy'),
+  download: $('#download'),
+  copied: $('#copied'),
+  outNote: $('#out-note'),
+  progress: $('#progress'),
+  progressBar: $('#progress-bar'),
+  progressText: $('#progress-text'),
+  cardsEmpty: $('#cards-empty'),
+  groups: $('#card-groups'),
+  bookmarklet: $('#bookmarklet'),
+  copyBookmarklet: $('#copy-bookmarklet'),
+  copiedBookmarklet: $('#copied-bookmarklet'),
+};
+
+function langTag(lang) {
+  return lang === 'fr' ? 'VF' : lang.toUpperCase();
+}
+
+function viewOf(entry) {
+  const tag = langTag(state.lang);
+  if (!entry.en) {
+    return {
+      status: entry.en === null ? 'missing' : 'pending',
+      label: entry.en === null ? 'Introuvable' : 'Recherche…',
+      card: null,
+      title: entry.name,
+      sub: '',
+      note: entry.en === null ? 'Scryfall ne connaît pas cette carte : vérifie son nom, son édition et son numéro.' : '',
+    };
+  }
+  if (!state.resolved) {
+    return { status: 'pending', label: 'Recherche…', card: entry.en, title: entry.en.name, sub: '', note: '' };
+  }
+  if (!entry.loc) {
+    return {
+      status: 'vo', label: 'Reste en VO', card: entry.en, title: entry.en.name, sub: '',
+      note: `Aucune impression ${state.lang === 'fr' ? 'française' : 'traduite'} de cette carte sur Scryfall.`,
+    };
+  }
+  if (state.mode === 'script') {
+    return {
+      status: entry.locSame ? 'same' : 'other',
+      label: `${tag} · ${entry.locSame ? 'ton édition' : 'autre édition'}`,
+      card: entry.loc,
+      title: entry.loc.loc,
+      sub: entry.en.name,
+      note: entry.locSame ? '' : `Ton impression (${entry.en.set.toUpperCase()} ${entry.en.cn}) n'existe pas en ${tag} : le script prendra celle-ci.`,
+    };
+  }
+  const check = entry.check;
+  if (!check || check.state === 'pending') {
+    return { status: 'pending', label: 'Vérification…', card: entry.loc, title: entry.loc.loc, sub: entry.en.name, note: '' };
+  }
+  if (check.state === 'ok') {
+    const same = check.card.set === entry.en.set && check.card.cn === entry.en.cn;
+    return {
+      status: same ? 'same' : 'other',
+      label: `${tag} · ${same ? 'ton édition' : 'autre édition'}`,
+      card: check.card,
+      title: check.name,
+      sub: entry.en.name,
+      note: '',
+    };
+  }
+  return {
+    status: 'vo',
+    label: 'Reste en VO',
+    card: entry.en,
+    title: entry.en.name,
+    sub: entry.loc.loc !== entry.en.name ? entry.loc.loc : '',
+    note: `${REASONS[check.reason] || REASONS.ambiguous} Le script VF l'affichera en ${tag}.`,
+  };
+}
+
+function renderCard(entry) {
+  const view = viewOf(entry);
+  const li = entry.el || document.createElement('li');
+  entry.el = li;
+  li.className = 'card';
+  li.dataset.status = view.status;
+  li.replaceChildren();
+
+  const thumb = document.createElement(view.card && view.card.uri ? 'a' : 'span');
+  thumb.className = 'thumb';
+  if (view.card && view.card.uri) {
+    thumb.href = view.card.uri;
+    thumb.target = '_blank';
+    thumb.rel = 'noopener';
+    thumb.title = 'Voir sur Scryfall';
+  }
+  if (view.card && view.card.img && view.card.img.small) {
+    const img = document.createElement('img');
+    img.src = view.card.img.small;
+    img.alt = view.title;
+    img.loading = 'lazy';
+    img.width = 146;
+    img.height = 204;
+    thumb.append(img);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  const name = document.createElement('p');
+  name.className = 'card-name';
+  const qty = document.createElement('span');
+  qty.className = 'qty';
+  qty.textContent = `${entry.qty}×`;
+  name.append(qty, view.title);
+  body.append(name);
+  if (view.sub) {
+    const sub = document.createElement('p');
+    sub.className = 'card-sub';
+    sub.textContent = view.sub;
+    body.append(sub);
+  }
+  const meta = document.createElement('p');
+  meta.className = 'card-meta';
+  if (view.card) {
+    const collector = document.createElement('span');
+    collector.className = 'collector';
+    collector.textContent = `${view.card.set.toUpperCase()} · ${view.card.cn} · ${view.card.lang.toUpperCase()}`;
+    collector.title = view.card.setName;
+    meta.append(collector);
+  }
+  const badge = document.createElement('span');
+  badge.className = 'badge';
+  badge.textContent = view.label;
+  meta.append(badge);
+  body.append(meta);
+  if (view.note) {
+    const note = document.createElement('p');
+    note.className = 'card-note';
+    note.textContent = view.note;
+    body.append(note);
+  }
+  li.append(thumb, body);
+  return li;
+}
+
+function renderCards() {
+  els.groups.replaceChildren();
+  els.cardsEmpty.hidden = state.entries.length > 0;
+  const order = ['commander', 'deck', 'sideboard'];
+  for (const section of order) {
+    const entries = state.entries.filter((e) => (e.section === 'companion' ? 'sideboard' : e.section) === section);
+    if (!entries.length) continue;
+    const group = document.createElement('div');
+    group.className = 'group';
+    const title = document.createElement('h3');
+    title.textContent = SECTION_LABELS[section];
+    const count = document.createElement('small');
+    count.textContent = `${entries.reduce((n, e) => n + e.qty, 0)} carte${entries.reduce((n, e) => n + e.qty, 0) > 1 ? 's' : ''}`;
+    title.append(count);
+    const list = document.createElement('ul');
+    list.className = 'card-list';
+    for (const entry of entries) list.append(renderCard(entry));
+    group.append(title, list);
+    els.groups.append(group);
+  }
+  if (state.ignored.length) {
+    const p = document.createElement('p');
+    p.className = 'ignored';
+    const count = state.ignored.reduce((n, e) => n + e.qty, 0);
+    p.textContent = `${count} carte${count > 1 ? 's' : ''} hors du deck (maybeboard, jetons) ${count > 1 ? 'ne sont pas reprises' : "n'est pas reprise"} dans la liste : ${state.ignored.map((e) => e.name).join(', ')}.`;
+    els.groups.append(p);
+  }
+  renderSummary();
+}
+
+function renderSummary() {
+  if (!state.entries.length || !state.resolved) {
+    els.summary.hidden = true;
+    return;
+  }
+  const totals = { same: 0, other: 0, vo: 0, missing: 0, pending: 0 };
+  for (const entry of state.entries) totals[viewOf(entry).status] += entry.qty;
+  const all = Object.values(totals).reduce((a, b) => a + b, 0);
+  const translated = totals.same + totals.other;
+  const tag = langTag(state.lang);
+  els.summary.hidden = false;
+  els.summary.replaceChildren();
+
+  const line = document.createElement('div');
+  line.className = 'summary-line';
+  const total = document.createElement('span');
+  total.className = 'summary-total';
+  total.textContent = `${translated} / ${all} cartes en ${tag}`;
+  const sub = document.createElement('span');
+  sub.className = 'summary-sub';
+  sub.textContent = totals.pending ? `${totals.pending} en cours de vérification` : (totals.vo ? `${totals.vo} restent en VO` : 'tout le deck est traduit');
+  line.append(total, sub);
+  const warnings = [];
+  if (totals.missing) {
+    warnings.push(`${totals.missing} carte${totals.missing > 1 ? 's' : ''} introuvable${totals.missing > 1 ? 's' : ''} sur Scryfall, retirée${totals.missing > 1 ? 's' : ''} de la liste (sinon drawspell refuserait tout l'import).`);
+  }
+  const commanders = state.entries.filter((e) => e.section === 'commander' && e.en !== null).reduce((n, e) => n + e.qty, 0);
+  if (commanders > 2) warnings.push(`drawspell accepte 2 commandants au maximum, ta liste en a ${commanders}.`);
+
+  const meter = document.createElement('div');
+  meter.className = 'meter';
+  meter.setAttribute('aria-hidden', 'true');
+  const legend = document.createElement('ul');
+  legend.className = 'legend';
+  const parts = [
+    ['same', `${tag}, ton édition`],
+    ['other', `${tag}, autre édition`],
+    ['vo', 'VO'],
+    ['missing', 'introuvables'],
+    ['pending', 'en cours'],
+  ];
+  for (const [key, label] of parts) {
+    if (!totals[key]) continue;
+    const bar = document.createElement('span');
+    bar.className = `s-${key}`;
+    bar.style.width = `${(totals[key] / all) * 100}%`;
+    meter.append(bar);
+    const item = document.createElement('li');
+    const dot = document.createElement('span');
+    dot.className = `dot s-${key}`;
+    item.append(dot, `${totals[key]} ${label}`);
+    legend.append(item);
+  }
+  els.summary.append(line, meter, legend);
+  for (const text of warnings) {
+    const warning = document.createElement('p');
+    warning.className = 'error';
+    warning.textContent = text;
+    els.summary.append(warning);
+  }
+}
+
+function renderOutput() {
+  const ready = state.entries.length > 0 && state.resolved && (state.mode === 'script' || state.namesDone);
+  els.deckOut.value = ready ? buildOutput(state.mode) : '';
+  els.deckOut.placeholder = state.running || (state.resolved && !ready)
+    ? 'Préparation de la liste… elle sera prête à la fin de la vérification.'
+    : 'La liste à coller dans drawspell (bouton « Load Deck ») apparaîtra ici.';
+  els.copy.disabled = !ready;
+  els.download.disabled = !ready;
+
+  /* Mesuré sur un deck de 100 cartes : drawspell cherche chaque nom traduit un par un (~1,3 s par ligne). */
+  let note = '';
+  if (ready && state.mode === 'names') {
+    const named = new Set(state.entries.filter((e) => e.check && e.check.state === 'ok').map((e) => e.check.name)).size;
+    const seconds = Math.round(named * 1.3);
+    if (seconds >= 20) {
+      note = `drawspell cherche chaque nom traduit un par un : le chargement du deck prendra environ ${seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${Math.round(seconds / 10) * 10} s`}. Laisse la fenêtre « Load Deck » ouverte jusqu'au bout.`;
+    }
+  } else if (ready) {
+    note = 'Active le script Drawspell VF sur la page de drawspell avant de cliquer sur « Load Deck ». Sans le script, cette liste se charge en anglais.';
+  }
+  els.outNote.textContent = note;
+  els.outNote.hidden = !note;
+}
+
+function renderMode() {
+  const names = state.mode === 'names';
+  els.modeNames.setAttribute('aria-selected', String(names));
+  els.modeScript.setAttribute('aria-selected', String(!names));
+  els.modeNote.textContent = names
+    ? "Rien à installer : les cartes sont écrites avec leur nom traduit. Chaque nom est vérifié auprès de Scryfall ; ceux que drawspell ne reconnaîtrait pas restent en VO, dans ton édition."
+    : 'Toutes les cartes traduites, dans ton édition quand elle existe. Active d\'abord le script Drawspell VF (voir plus bas), puis colle cette liste dans « Load Deck ».';
+}
+
+function setProgress(fraction, text) {
+  els.progress.hidden = false;
+  els.progressBar.style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
+  els.progressText.textContent = text;
+}
+
+function showError(message) {
+  els.error.textContent = message;
+  els.error.hidden = !message;
+}
+
+function makeContext(runId) {
+  return {
+    isCancelled: () => runId !== state.runId,
+    onPause: (seconds) => { els.progressText.textContent = `Scryfall demande une courte pause : reprise dans ${seconds} s…`; },
+    onStep: (text) => { els.progressText.textContent = text; },
+    onProgress: setProgress,
+  };
+}
+
+async function runNames(runId) {
+  const ctx = makeContext(runId);
+  state.running = true;
+  els.run.disabled = true;
+  try {
+    setProgress(0.45, 'Vérification des noms dans drawspell…');
+    await verifyNames(ctx);
+    setProgress(1, 'Liste prête : copie-la puis colle-la dans drawspell (« Load Deck »).');
+  } finally {
+    if (runId === state.runId) {
+      state.running = false;
+      els.run.disabled = false;
+      renderCards();
+      renderOutput();
+    }
+  }
+}
+
+async function run() {
+  showError('');
+  const parsed = parseDeck(els.deckIn.value);
+  if (!parsed.entries.length) {
+    showError('Aucune carte reconnue. Colle l\'export texte de ton deck : une carte par ligne, par exemple « 1 Murder (DSK) 110 ».');
+    return;
+  }
+  const runId = ++state.runId;
+  const ctx = makeContext(runId);
+  Object.assign(state, { entries: parsed.entries, ignored: parsed.ignored, lang: els.lang.value, resolved: false, namesDone: false, running: true });
+  els.run.disabled = true;
+  renderCards();
+  renderOutput();
+  try {
+    setProgress(0.05, 'Recherche de tes cartes sur Scryfall…');
+    await resolveEnglish(state.entries, ctx);
+    renderCards();
+    setProgress(0.25, `Recherche des impressions en ${LANGS.find(([code]) => code === state.lang)[1].toLowerCase()}…`);
+    await resolveLocalized(state.entries, state.lang, ctx);
+    state.resolved = true;
+    renderCards();
+    renderOutput();
+    if (state.mode === 'names') {
+      state.running = false;
+      await runNames(runId);
+    } else {
+      setProgress(1, 'Liste prête. Active le script VF sur drawspell, puis colle la liste dans « Load Deck ».');
+    }
+  } catch (err) {
+    if (err instanceof Cancelled) return;
+    console.error(err);
+    showError(err instanceof ScryfallError ? err.message : 'Une erreur inattendue a interrompu la traduction. Relance-la ; si elle persiste, recharge la page.');
+    els.progress.hidden = true;
+  } finally {
+    if (runId === state.runId) {
+      state.running = false;
+      els.run.disabled = false;
+      renderOutput();
+    }
+  }
+}
+
+function setMode(mode) {
+  if (state.mode === mode) return;
+  state.mode = mode;
+  prefs.set('mode', mode);
+  renderMode();
+  renderCards();
+  renderOutput();
+  if (mode === 'names' && state.resolved && !state.namesDone && !state.running) {
+    const runId = ++state.runId;
+    runNames(runId).catch((err) => {
+      if (err instanceof Cancelled) return;
+      console.error(err);
+      showError(err instanceof ScryfallError ? err.message : 'La vérification des noms a échoué. Relance la traduction.');
+    });
+  }
+}
+
+/* ---------- Copier, télécharger, favori ---------- */
+
+async function copyText(text, textarea, feedback, message) {
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+    }
+  }
+  feedback.textContent = ok ? message : 'Copie automatique impossible : sélectionne le texte et copie-le à la main.';
+  feedback.hidden = false;
+  clearTimeout(feedback.timer);
+  feedback.timer = setTimeout(() => { feedback.hidden = true; }, 5000);
+}
+
+function bookmarkletCode(lang) {
+  const source = document.getElementById('vf-src').textContent
+    .replace(/^\s*\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==\s*/, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/var LANG = '[a-z]+';/, `var LANG = '${lang}';`)
+    .split('\n').map((line) => line.trim()).filter(Boolean).join('\n');
+  return 'javascript:' + encodeURIComponent(source);
+}
+
+function renderBookmarklet() {
+  const code = bookmarkletCode(els.lang.value);
+  els.bookmarklet.href = code;
+  els.bookmarklet.textContent = els.lang.value === 'fr' ? 'Drawspell VF' : `Drawspell ${langTag(els.lang.value)}`;
+}
+
+/* ---------- Démarrage ---------- */
+
+for (const [code, label] of LANGS) {
+  const option = document.createElement('option');
+  option.value = code;
+  option.textContent = label;
+  els.lang.append(option);
+}
+els.lang.value = prefs.get('lang', 'fr');
+if (!els.lang.value) els.lang.value = 'fr';
+state.mode = prefs.get('mode', 'names') === 'script' ? 'script' : 'names';
+els.deckIn.value = prefs.get('draft', '');
+renderMode();
+renderOutput();
+renderBookmarklet();
+
+els.run.addEventListener('click', run);
+els.modeNames.addEventListener('click', () => setMode('names'));
+els.modeScript.addEventListener('click', () => setMode('script'));
+els.lang.addEventListener('change', () => {
+  prefs.set('lang', els.lang.value);
+  renderBookmarklet();
+  if (state.entries.length && els.lang.value !== state.lang) {
+    showError('Langue changée : relance la traduction pour mettre la liste à jour.');
+  }
+});
+let draftTimer = 0;
+els.deckIn.addEventListener('input', () => {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => prefs.set('draft', els.deckIn.value), 400);
+});
+$('#load-example').addEventListener('click', () => {
+  els.deckIn.value = EXAMPLE;
+  prefs.set('draft', EXAMPLE);
+  els.deckIn.focus();
+});
+els.file.addEventListener('change', () => {
+  const file = els.file.files && els.file.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    els.deckIn.value = String(reader.result || '');
+    prefs.set('draft', els.deckIn.value);
+    els.file.value = '';
+    run();
+  };
+  reader.onerror = () => showError('Impossible de lire ce fichier. Copie son contenu dans la zone de texte.');
+  reader.readAsText(file);
+});
+els.copy.addEventListener('click', () => copyText(els.deckOut.value, els.deckOut, els.copied, 'Liste copiée. Dans drawspell : « Load Deck », colle, puis valide.'));
+els.download.addEventListener('click', () => {
+  const blob = new Blob([els.deckOut.value + '\n'], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `deck-drawspell-${state.mode === 'names' ? 'noms' : 'script'}-${state.lang}.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+});
+els.bookmarklet.addEventListener('click', (event) => {
+  event.preventDefault();
+  els.copiedBookmarklet.hidden = true;
+  showBookmarkletHint();
+});
+function showBookmarkletHint() {
+  const hint = els.bookmarklet.nextElementSibling;
+  if (hint && hint.classList.contains('copied')) return;
+  const p = document.createElement('p');
+  p.className = 'copied';
+  p.textContent = 'Glisse ce bouton dans ta barre de favoris, puis utilise-le sur drawspell.';
+  els.bookmarklet.after(p);
+  setTimeout(() => p.remove(), 5000);
+}
+els.copyBookmarklet.addEventListener('click', () => copyText(bookmarkletCode(els.lang.value), null, els.copiedBookmarklet, 'Code du favori copié.'));
+
+window.__drawspellVFPage = { parseDeck, buildOutput, state };
+})();
+</script>
+</body>
+</html>
